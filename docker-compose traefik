@@ -1,0 +1,651 @@
+diff --git a/docker-compose-cl.yml b/docker-compose-cl.yml
+index 1cb39d9..51f3a0b 100644
+--- a/docker-compose-cl.yml
++++ b/docker-compose-cl.yml
+@@ -1,43 +1,55 @@
+ version: "3.6"
++
++x-deploy-restart: &restart
++  restart_policy:
++    condition: on-failure
++
++x-default-labels: &traefik
++  traefik.enable: "true"
++  traefik.docker.network: "traefik_proxy"
++  traefik.frontend.headers.SSLRedirect: "true"
++  traefik.frontend.headers.STSSeconds: "315360000"
++  traefik.frontend.headers.browserXSSFilter: "true"
++  traefik.frontend.headers.contentTypeNosniff: "true"
++  traefik.frontend.headers.forceSTSHeader: "true"
++  traefik.frontend.headers.SSLHost: "${DOMAIN}"
++  traefik.frontend.headers.STSIncludeSubdomains: "true"
++  traefik.frontend.headers.STSPreload: "true"
++  traefik.frontend.headers.frameDeny: "true"
++
++x-default-env: &default_env
++  PUID: "${PUID}"
++  PGID: "${PGID}"
++  TZ: "${TZ}"
++
+ services:
+   traefik:
+-    hostname: traefik
++    hostname: traefik.${DOMAINNAME}
+     image: traefik:latest
+     container_name: traefik
+-    restart: always
+-    domainname: ${DOMAINNAME}
+-    networks:
+-      - default
+-      - traefik_proxy
+     ports:
+-      - "80:80"
+-      - "443:443"
++      - "80:80/tcp"
++      - "443:443/tcp"
+     environment:
+-      - CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL}
+-      - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=traefik"
+-      - "traefik.frontend.rule=Host:traefik.${DOMAINNAME}"  
+-      - "traefik.port=8080"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      CLOUDFLARE_EMAIL: "${CLOUDFLARE_EMAIL}"
++      CLOUDFLARE_API_KEY: "${CLOUDFLARE_API_KEY}"
++    networks:
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "traefik"
++        traefik.frontend.rule: "Host:traefik.${DOMAINNAME}"
++        traefik.port: "8080"
+     volumes:
+       - /var/run/docker.sock:/var/run/docker.sock:ro
+       - ${USERDIR}/docker/traefik:/etc/traefik
+       - ${USERDIR}/docker/shared:/shared
+ 
+   plexms:
++    hostname: "Zel"
+     container_name: plexms
+-    restart: always
+     image: plexinc/pms-docker
+     volumes:
+       - ${USERDIR}/docker/plexms:/config
+@@ -55,36 +67,27 @@ services:
+       - "32413:32413/udp"
+       - "32414:32414/udp"
+     environment:
+-      - TZ=${TZ}
+-      - HOSTNAME="Zel"
+-      - PLEX_UID=${PUID}
+-      - PLEX_GID=${PGID}
+-      - ADVERTISE_IP="http://192.168.1.200:32400/"
++      TZ: "${TZ}"
++      HOSTNAME: "Zel"
++      PLEX_UID: "${PUID}"
++      PLEX_GID: "${PGID}"
++      ADVERTISE_IP: "http://192.168.1.200:32400/"
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=plexms"
+-      - "traefik.frontend.rule=Host:plex.${DOMAINNAME}"
+-      - "traefik.port=32400"
+-      - "traefik.protocol=http"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "plexms"
++        traefik.frontend.rule: "Host:plex.${DOMAINNAME}"
++        traefik.port: "32400"
++        traefik.protocol: "http"
+ 
+-# Portainer – Web UI for Containers
++  # Portainer – Web UI for Containers
+   # Portainer is a web interface for managing docker containers.
+   portainer:
+     image: portainer/portainer
+     container_name: portainer
+-    restart: always
+     command: -H unix:///var/run/docker.sock
+     volumes:
+       - /var/run/docker.sock:/var/run/docker.sock
+@@ -93,60 +96,40 @@ services:
+     environment:
+       - TZ=${TZ}
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=portainer"
+-      - "traefik.frontend.rule=Host:portainer.${DOMAINNAME}"  
+-      - "traefik.port=9000"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "portainer"
++        traefik.frontend.rule: "Host:portainer.${DOMAINNAME}"  
++        traefik.port: "9000"
+ 
+ # Organizr – Unified HTPC/Home Server Web Interface
+   # Organizr is a web interface to bring all your HTPC / Home Server apps together.
+   organizr:
+     container_name: organizr
+-    restart: always
+     image: lsiocommunity/organizr
+     volumes:
+       - ${USERDIR}/docker/organizr:/config
+       - ${USERDIR}/docker/shared:/shared
+     environment:
+-      - PUID=${PUID}
+-      - PGID=${PGID}
+-      - TZ=${TZ}
++      << : *default_env
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=organizr"
+-      - "traefik.frontend.rule=Host:organizr.${DOMAINNAME}"  
+-      - "traefik.port=80"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "organizr"
++        traefik.frontend.rule: "Host:organizr.${DOMAINNAME}"  
++        traefik.port: "80"
+ 
+ # Home Assistant – Smart Home Hub
+   # Home Assistant (HASS) is an awesome open source python-based home automation software with integration for over 1000 platforms. 
+   # HASS is one of the apps that I could not get to work as a subdirectory. So you will need to use a subdomain.
+   homeassistant:
+     container_name: homeassistant
+-    restart: always
+     image: homeassistant/home-assistant
+     #devices:
+     #  - /dev/ttyUSB0:/dev/ttyUSB0
+@@ -158,27 +141,16 @@ services:
+       - ${USERDIR}/docker/shared:/shared
+     privileged: true
+     environment:
+-      - PUID=${PUID}
+-      - PGID=${PGID}
+-      - TZ=${TZ}
++      << : *default_env
+     networks:
+-      - traefik_proxy
+-      - default
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=homeassistant"
+-      - "traefik.frontend.rule=Host:hass.${DOMAINNAME}"
+-      - "traefik.port=8123"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "homeassistant"
++        traefik.frontend.rule: "Host:hass.${DOMAINNAME}"
++        traefik.port: "8123"
+     #Devices List – This list will make USB devices available to home assistant inside the docker container. If you have a USB Z-wave stick then you will need to find out its device address. Typically, it should be /dev/ttyACM0 but you can find out the correct address using one of the following commands:
+     #  ls -ltr /dev/tty*|tail -n 1
+     #  ls /dev
+@@ -193,7 +165,6 @@ services:
+       - NET_ADMIN
+     devices:
+       - /dev/net/tun
+-    restart: always
+     dns:
+       - 1.1.1.1
+       - 1.0.0.1
+@@ -205,39 +176,29 @@ services:
+       - ${USERDIR}/Downloads/completed:/data/completed
+       - ${USERDIR}/Downloads/incomplete:/data/incomplete
+     environment:
+-      - OPENVPN_PROVIDER=IPVANISH
+-      - OPENVPN_USERNAME=username
+-      - OPENVPN_PASSWORD=password
+-      - OPENVPN_CONFIG="server" 
+-      - OPENVPN_OPTS=--inactive 3600 --ping 10 --ping-exit 60
+-      - LOCAL_NETWORK=192.168.1.0/24
+-      - PUID=${PUID}
+-      - PGID=${PGID}
+-      - TZ=${TZ}
+-      - TRANSMISSION_RPC_AUTHENTICATION_REQUIRED=true
+-      - TRANSMISSION_RPC_HOST_WHITELIST="127.0.0.1,192.168.*.*"
+-      - TRANSMISSION_RPC_PASSWORD=password
+-      - TRANSMISSION_RPC_USERNAME=user
+-      - TRANSMISSION_UMASK=002
+-      - TRANSMISSION_RATIO_LIMIT=1.00
+-      - TRANSMISSION_RATIO_LIMIT_ENABLED=true
++      << : *default_env
++      OPENVPN_PROVIDER: "IPVANISH"
++      OPENVPN_USERNAME: "username"
++      OPENVPN_PASSWORD: "password"
++      OPENVPN_CONFIG: "server"
++      OPENVPN_OPTS: "--inactive 3600 --ping 10 --ping-exit 60"
++      LOCAL_NETWORK: "192.168.1.0/24"
++      TRANSMISSION_RPC_AUTHENTICATION_REQUIRED: "true"
++      TRANSMISSION_RPC_HOST_WHITELIST: "127.0.0.1,192.168.*.*"
++      TRANSMISSION_RPC_PASSWORD: "password"
++      TRANSMISSION_RPC_USERNAME: "user"
++      TRANSMISSION_UMASK: "002"
++      TRANSMISSION_RATIO_LIMIT: "1.00"
++      TRANSMISSION_RATIO_LIMIT_ENABLED: "true"
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=transmission-vpn"
+-      - "traefik.frontend.rule=Host:transmission.${DOMAINNAME}"
+-      - "traefik.port=9091"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "transmission-vpn"
++        traefik.frontend.rule: "Host:transmission.${DOMAINNAME}"
++        traefik.port: "9091"
+ 
+ # SABnzbd – Usenet (NZB) Downloader
+   # SABnzbd is a Usenet downloader.
+@@ -249,28 +210,18 @@ services:
+       - ${USERDIR}/Downloads/completed:/downloads
+       - ${USERDIR}/Downloads/incomplete:/incomplete-downloads
+       - ${USERDIR}/docker/shared:/shared
+-    restart: always
+     environment:
+-      - PUID=${PUID}
+-      - PGID=${PGID}
+-      - TZ=${TZ}
++      << : *default_env
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=sabnzbd"
+-      - "traefik.frontend.rule=Host:sabnzbd.${DOMAINNAME}"
+-      - "traefik.port=8080"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "sabnzbd"
++        traefik.frontend.rule: "Host:sabnzbd.${DOMAINNAME}"
++        traefik.port: "8080"
++
+ 
+ # Radarr – Movie Download and Management
+   # Radarr is an automated movie downloader.
+@@ -283,28 +234,17 @@ services:
+       - ${USERDIR}/media/4tb_a/Movies:/movies
+       - "/etc/localtime:/etc/localtime:ro"
+       - ${USERDIR}/docker/shared:/shared
+-    restart: always
+     environment:
+-      - PUID=${PUID}
+-      - PGID=${PGID}
+-      - TZ=${TZ}
++      << : *default_env
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=radarr"
+-      - "traefik.frontend.rule=Host:radarr.${DOMAINNAME}"
+-      - "traefik.port=7878"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "radarr"
++        traefik.frontend.rule: "Host:radarr.${DOMAINNAME}"
++        traefik.port: "7878"
+ 
+ # Sonarr – TV Show Download and Management
+   # Sonarr is an automated TV Show episode downloader.
+@@ -317,93 +257,60 @@ services:
+       - ${USERDIR}/media/4tb_a/tvShows:/tv
+       - "/etc/localtime:/etc/localtime:ro"
+       - ${USERDIR}/docker/shared:/shared
+-    restart: always
+     environment:
+-      - PUID=${PUID}
+-      - PGID=${PGID}
+-      - TZ=${TZ}
+-    networks:
+-      - traefik_proxy
++      << : *default_env
+     extra_hosts:
+       - "hydra.rockfarm.rocks:172.18.0.10"
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=sonarr"
+-      - "traefik.frontend.rule=Host:sonarr.${DOMAINNAME}"
+-      - "traefik.port=8989"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++    networks:
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "sonarr"
++        traefik.frontend.rule: "Host:sonarr.${DOMAINNAME}"
++        traefik.port: "8989"
+ 
+ # Tautulli (aka PlexPy) – Monitoring Plex Usage
+   # Tautulli (previously known as PlexPy) is a Plex usage monitoring app.
+   tautulli:
+     container_name: tautulli
+-    restart: always
+     image: linuxserver/tautulli
+     volumes:
+       - ${USERDIR}/docker/tautulli/config:/config
+       - ${USERDIR}/docker/tautulli/logs:/logs:ro
+       - ${USERDIR}/docker/shared:/shared
+     environment:
+-      - PUID=${PUID}
+-      - PGID=${PGID}
+-      - TZ=${TZ}
++      << : *default_env
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=tautulli"
+-      - "traefik.frontend.rule=Host:tautulli.${DOMAINNAME}"
+-      - "traefik.port=8181"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "tautulli"
++        traefik.frontend.rule: "Host:tautulli.${DOMAINNAME}"
++        traefik.port: "8181"
+ 
+ # Ombi – Accept Requests for your Media Server
+   # Ombi allows Plex users to request media to the owner of the media server or even automatically download them. 
+   ombi:
+     container_name: ombi
+-    restart: always
+     image: linuxserver/ombi
+     volumes:
+       - ${USERDIR}/docker/ombi:/config
+       - ${USERDIR}/docker/shared:/shared
+     environment:
+-      - PUID=${PUID}
+-      - PGID=${PGID}
+-      - TZ=${TZ}
++      << : *default_env
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=ombi"
+-      - "traefik.frontend.rule=Host:ombi.${DOMAINNAME}"
+-      - "traefik.port=3579"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "ombi"
++        traefik.frontend.rule: "Host:ombi.${DOMAINNAME}"
++        traefik.port: "3579"
+ 
+ # NZBHydra – NZB Meta Search
+   # NZB Hydra allows you to search NZB files and add them to your NZB client for downloading. 
+@@ -414,28 +321,18 @@ services:
+       - ${USERDIR}/docker/hydra:/config
+       - ${USERDIR}/Downloads:/downloads
+       - ${USERDIR}/docker/shared:/shared
+-    restart: always
+     environment:
+-      - PUID=${PUID}
+-      - PGID=${PGID}
+-      - TZ=${TZ}
++      << : *default_env
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=hydra"
+-      - "traefik.frontend.rule=Host:hydra.${DOMAINNAME}"
+-      - "traefik.port=5075"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default: {}
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.enable: "true"
++        traefik.backend: "hydra"
++        traefik.frontend.rule: "Host:hydra.${DOMAINNAME}"
++        traefik.port: "5075"
+ 
+ # Jackett – Torrent Proxy
+   # Jackett serves as a proxy for several torrent indexes and extends the sources available for apps such as Sonarr and Radarr.
+@@ -447,63 +344,46 @@ services:
+       - ${USERDIR}/Downloads/completed:/downloads
+       - "/etc/localtime:/etc/localtime:ro"
+       - ${USERDIR}/docker/shared:/shared
+-    restart: always
+     environment:
+-      - PUID=${PUID}
+-      - PGID=${PGID}
+-      - TZ=${TZ}
++      << : *default_env
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=jackett"
+-      - "traefik.frontend.rule=Host:jackett.${DOMAINNAME}"
+-      - "traefik.port=9117"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default:
++        aliases:
++          - jackett
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "jackett"
++        traefik.frontend.rule: "Host:jackett.${DOMAINNAME}"
++        traefik.port: "9117"
+ 
+-# NextCloud – Your Own Cloud Storage
++  # NextCloud – Your Own Cloud Storage
+   # NextCloud gives you your personal/private cloud storage. NextCloud is one of the apps that I could not get to work as a subdirectory.
+   # So you will need to use a subdomain (eg. mynextcloud.crabdance.com).
+   nextcloud:
+     container_name: nextcloud
+-    restart: always
+     image: linuxserver/nextcloud
+     volumes:
+       - ${USERDIR}/docker/nextcloud:/config
+       - ${USERDIR}/shared_data:/data
+       - ${USERDIR}/docker/shared:/shared
+     environment:
+-      - PUID=${PUID}
+-      - PGID=${PGID}
++      << : *default_env
+     networks:
+-      - traefik_proxy
+-    labels:
+-      - "traefik.enable=true"
+-      - "traefik.backend=nextcloud"
+-      - "traefik.frontend.rule=Host:nextcloud.${DOMAINNAME}"
+-      - "traefik.port=443"
+-      - "traefik.protocol=https"
+-      - "traefik.docker.network=traefik_proxy"
+-      - "traefik.frontend.headers.SSLRedirect=true"
+-      - "traefik.frontend.headers.STSSeconds=315360000"
+-      - "traefik.frontend.headers.browserXSSFilter=true"
+-      - "traefik.frontend.headers.contentTypeNosniff=true"
+-      - "traefik.frontend.headers.forceSTSHeader=true"
+-      - "traefik.frontend.headers.SSLHost=example.com"
+-      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+-      - "traefik.frontend.headers.STSPreload=true"
+-      - "traefik.frontend.headers.frameDeny=true"
++      default:
++        aliases:
++          - nextcloud
++    deploy:
++      << : *restart
++      labels:
++        << : *traefik
++        traefik.backend: "nextcloud"
++        traefik.frontend.rule: "Host:nextcloud.${DOMAINNAME}"
++        traefik.port: "443"
++        traefik.protocol: "https"
+ 
+ networks:
+     default:
+-    traefik_proxy:
+-        external: true
++      external: true
++      name: "traefik_proxy"
