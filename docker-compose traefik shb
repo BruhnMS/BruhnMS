@@ -1,0 +1,337 @@
+#Reference: https://www.smarthomebeginner.com/docker-home-media-server-2018-basic
+#Requirement: Set environmental variables: USERDIR, PUID, PGID, MYSQL_ROOT_PASSWORD, and TZ as explained in the reference.
+
+#Edit docker-compose cmd: nano ~/docker/docker-compose.yml
+#Execute docker-compose cmd: docker-compose -f ~/docker/docker-compose.yml up -d
+#Backup docker-compose cmd: sudo cp ~/docker/docker-compose.yml /mnt/Yankee/DOCKER
+
+version: "3.6"
+services:
+
+######### FRONTENDS ##########
+
+ #Portainer - WebUI for Containers
+  portainer:
+    image: portainer/portainer
+    hostname: portainer
+    container_name: portainer
+    restart: always
+    command: -H unix:///var/run/docker.sock
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${USERDIR}/docker/portainer/data:/data
+      - ${USERDIR}/docker/shared:/shared
+    environment:
+      - TZ=${TZ}
+
+# Organizer - Unified HTPC/Home Server Web Interface
+  organizr:
+    container_name: organizr
+    hostname: organizr
+    restart: always
+    image: lsiocommunity/organizr
+    volumes:
+      - ${USERDIR}/docker/organizr:/config
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "80:80"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+# WebUI for MariaDB
+  phpmyadmin:
+    hostname: phpmyadmin
+    container_name: phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    links:
+      - mariadb:db
+#    ports:
+#      - 80:80
+    environment:
+      - PMA_HOST=mariadb
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+
+######### DOCKER RELATED ##########
+
+# Watchtower - Automatic Update of Containers/Apps
+  watchtower:
+    container_name: watchtower
+    hostname: watchtower
+    restart: always
+    image: v2tec/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --schedule "0 0 4 * * *" --cleanup
+
+######### SMART HOME APPS ##########
+
+# Home Assistant - Smart Home Hub
+  homeassistant:
+    container_name: homeassistant
+    hostname: hass
+    restart: always
+    image: homeassistant/home-assistant
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/ttyUSB1:/dev/ttyUSB1
+      - /dev/ttyACM0:/dev/ttyACM0
+    volumes:
+      - ${USERDIR}/docker/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "8123:8123"
+    privileged: true
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+######### DOWNLOADERS ##########
+
+# SABnzbd – Usenet (NZB) Downloader
+  sabnzbd:
+    image: "linuxserver/sabnzbd"
+    hostname: sabnzbd
+    container_name: "sabnzbd"
+    volumes:
+      - ${USERDIR}/docker/sabnzbd:/config
+      - /mnt:/mnt
+      - /mnt/Victor/Clients/Complete:/downloads
+      - /mnt/Victor/Clients/Active:/incomplete-downloads
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+        - "8080:8080"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+######### PERSONAL VIDEO RECORDERS ##########
+
+# Radarr – Movie Download and Management
+  radarr:
+    image: "linuxserver/radarr"
+    hostname: radarr
+    container_name: "radarr"
+    volumes:
+      - ${USERDIR}/docker/radarr:/config
+      - /mnt:/mnt
+      - /mnt/Victor/Clients/Complete:/downloads
+      - /mnt/Victor/Radarr/Movies:/movies
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "7878:7878"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+# Sonarr – TV Show Download and Management
+  sonarr:
+    image: "linuxserver/sonarr"
+    hostname: sonarr
+    container_name: "sonarr"
+    volumes:
+      - ${USERDIR}/docker/sonarr:/config
+      - /mnt:/mnt
+      - /mnt/Victor/Clients/Complete:/downloads
+      - /mnt/Victor/Sonarr/TV Shows:/tv
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+        - "8989:8989"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+#LIDARR - Music Download and Management
+  lidarr:
+    image: "linuxserver/lidarr"
+    hostname: lidarr
+    container_name: "lidarr"
+    volumes:
+      - ${USERDIR}/docker/lidarr:/config
+      - /mnt:/mnt
+      - /mnt/Victor/Clients/Complete:/downloads
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "8686:8686"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+######### MEDIA SERVER APPS ##########
+
+# Plex Media Server
+  plexms:
+    container_name: plexms
+    hostname: BruhnMS
+    restart: always
+    network_mode: host
+    image: plexinc/pms-docker
+    volumes:
+      - /mnt/Yankee/PLEX/plexmediaserver:/config
+      - /mnt/RAM_disk:/transcode
+      - /mnt:/mnt
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "32400:32400/tcp"
+    environment:
+      - TZ=${TZ}
+      - HOSTNAME="BruhnMS"
+      - PLEX_CLAIM="claim-in4noxYiYj7eP8z3CGqK"
+      - PLEX_UID=${PUID}
+      - PLEX_GID=${PGID}
+      - ADVERTISE_IP="http://192.168.1.100:32400/web"
+
+# Tautulli (aka PlexPy) – Monitoring Plex Usage
+  tautulli:
+    container_name: tautulli
+    hostname: tautulli
+    restart: always
+    image: linuxserver/tautulli
+    volumes:
+      - ${USERDIR}/docker/tautulli/config:/config
+      - ${USERDIR}/docker/tautulli/logs:/logs:ro
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "8181:8181"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}  
+
+# Ombi – Accept Requests for your Media Server
+  ombi:
+    container_name: ombi
+    hostname: ombi
+    restart: always
+    image: linuxserver/ombi
+    volumes:
+      - ${USERDIR}/docker/ombi:/config
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "3579:3579"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+######### SEARCHERS ##########
+
+# NZBHydra – NZB Meta Search
+  hydra:
+    image: "linuxserver/hydra"
+    hostname: hydra
+    container_name: "hydra"
+    volumes:
+      - ${USERDIR}/docker/hydra:/config
+      - ${USERDIR}/Downloads:/downloads
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "5075:5075"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ} 
+
+######### UTILITIES ##########
+
+# MariaDB – Database Server for your Apps
+  mariadb:
+    image: "linuxserver/mariadb"
+    container_name: "mariadb"
+    hostname: mariadb
+    volumes:
+        - ${USERDIR}/docker/mariadb:/config
+    ports:
+      - target: 3306
+        published: 3306
+        protocol: tcp
+        mode: host
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+# NextCloud – Your Own Cloud Storage
+  nextcloud:
+    container_name: nextcloud
+    hostname: nextcloud
+    restart: always
+    image: linuxserver/nextcloud
+    volumes:
+      - ${USERDIR}/docker/nextcloud:/config
+      - ${USERDIR}/shared_data:/data
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "443:443"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+#Traefik - Your Own Edge Router
+  traefik:
+    hostname: traefik
+    image: traefik:v1.7.16
+    container_name: traefik
+    restart: always
+    domainname: ${DOMAINNAME}
+    networks:
+      - default
+      - traefik_proxy
+    ports:
+      - "9100:9100"
+#      - "80:80"
+#      - "443:443"
+    environment:
+      - NAMECHEAP_API_KEY=${NAMECHEAP_API_KEY}
+      - NAMECHEAP_API_USER=${NAMECHEAP_API_USER}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=traefik"
+      - "traefik.frontend.rule=Host:traefik.${DOMAINNAME}"  
+#      - "traefik.frontend.rule=Host:${DOMAINNAME}; PathPrefixStrip: /traefik"
+      - "traefik.port=9100"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.browserXSSFilter=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.SSLHost=example.com"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+      - "traefik.frontend.headers.frameDeny=true"
+      - "traefik.frontend.auth.basic.users=${HTTP_USERNAME}:${HTTP_PASSWORD}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${USERDIR}/docker/traefik:/etc/traefik
+      - ${USERDIR}/docker/shared:/shared
+
+######### NETWORK ##########
+
+# Traefik_Proxy – External Treafik docker network
+networks:
+  traefik_proxy:
+    external:
+      name: traefik_proxy
+  default:
+    driver: bridge
