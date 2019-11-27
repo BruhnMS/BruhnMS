@@ -1,0 +1,14 @@
+#Edit environment cmd: sudo nano /etc/environment
+#Backup environment cmd: sudo cp /etc/environment /mnt/Yankee/DOCKER
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/$
+PUID=1000
+PGID=999
+TZ="America/Chicago"
+USERDIR="/home/bruhn"
+MYSQL_ROOT_PASSWORD="IH8thr33s"
+HTTP_USERNAME=BruhnMS
+HTTP_PASSWORD=$apr1$huqyHLSe$G3EhdXxtwkdLRdOsLXS.41
+DOMAINNAME=bruhnms.com
+NAMECHEAP_API_KEY=4e31b27ec4c643efa42154320a67c5a8
+NAMECHEAP_API_USER=thebruhns
