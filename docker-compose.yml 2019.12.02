@@ -198,7 +198,7 @@ services:
     volumes:
       - ${USERDIR}/docker/sonarr2:/config
       - /mnt:/mnt
-      - /home/bruhn/Downloads:/downloads
+      - /mnt/Victor/Clients/Complete:/downloads
       - /mnt/Television4/MEDIA/TV Shows - Incomplete:/tv
       - "/etc/localtime:/etc/localtime:ro"
       - ${USERDIR}/docker/shared:/shared
