@@ -191,9 +191,9 @@ services:
       - TZ=${TZ}
 
 # Sonarr – 2nd Instance
-  sonarr:
+  sonarr2:
     image: "linuxserver/sonarr"
-    hostname: sonarr
+    hostname: sonarr2
     container_name: "sonarr2"
     volumes:
       - ${USERDIR}/docker/sonarr2:/config
