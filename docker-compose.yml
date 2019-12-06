@@ -36,7 +36,7 @@ services:
       - ${USERDIR}/docker/organizr:/config
       - ${USERDIR}/docker/shared:/shared
     ports:
-      - "80:80"
+      - "10001:80"
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -50,11 +50,27 @@ services:
     restart: always
     links:
       - mariadb:db
-#    ports:
-#      - 80:80
+    ports:
+       - "10002:80"
     environment:
       - PMA_HOST=mariadb
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+
+# pyRenamer - pyRenamer is an application for mass renaming files
+  pyrenamer:
+    container_name: pyRenamer
+    hostname: pyRenamer
+    restart: always
+    image: mikenye/pyrenamer
+    volumes:
+      - ${USERDIR}/docker/pyRenamer:/config:rw
+      - /mnt:/storage:rw
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "5800:5800"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
 
 ######### DOCKER RELATED ##########
 
@@ -85,7 +101,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ${USERDIR}/docker/shared:/shared
     ports:
-      - "8123:8123"
+      - "10004:8123"
     privileged: true
     environment:
       - PUID=${PUID}
@@ -106,7 +122,7 @@ services:
       - /mnt/Victor/Clients/Active:/incomplete-downloads
       - ${USERDIR}/docker/shared:/shared
     ports:
-        - "8080:8080"
+        - "10005:8080"
     restart: always
     environment:
       - PUID=${PUID}
@@ -128,7 +144,7 @@ services:
       - "/etc/localtime:/etc/localtime:ro"
       - ${USERDIR}/docker/shared:/shared
     ports:
-      - "7878:7878"
+      - "10006:7878"
     restart: always
     environment:
       - PUID=${PUID}
@@ -148,7 +164,7 @@ services:
       - "/etc/localtime:/etc/localtime:ro"
       - ${USERDIR}/docker/shared:/shared
     ports:
-        - "8989:8989"
+        - "10007:8989"
     restart: always
     environment:
       - PUID=${PUID}
@@ -167,7 +183,27 @@ services:
       - "/etc/localtime:/etc/localtime:ro"
       - ${USERDIR}/docker/shared:/shared
     ports:
-      - "8686:8686"
+      - "10008:8686"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+# Sonarr – 2nd Instance
+  sonarr2:
+    image: "linuxserver/sonarr"
+    hostname: sonarr2
+    container_name: "sonarr2"
+    volumes:
+      - ${USERDIR}/docker/sonarr2:/config
+      - /mnt:/mnt
+      - /mnt/Victor/Clients/Complete:/downloads
+      - /mnt/Television4/MEDIA/TV Shows - Incomplete:/tv
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+        - "10107:8989"
     restart: always
     environment:
       - PUID=${PUID}
@@ -209,7 +245,7 @@ services:
       - ${USERDIR}/docker/tautulli/logs:/logs:ro
       - ${USERDIR}/docker/shared:/shared
     ports:
-      - "8181:8181"
+      - "10010:8181"
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -225,7 +261,7 @@ services:
       - ${USERDIR}/docker/ombi:/config
       - ${USERDIR}/docker/shared:/shared
     ports:
-      - "3579:3579"
+      - "10011:3579"
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -243,7 +279,7 @@ services:
       - ${USERDIR}/Downloads:/downloads
       - ${USERDIR}/docker/shared:/shared
     ports:
-      - "5075:5075"
+      - "10012:5075"
     restart: always
     environment:
       - PUID=${PUID}
@@ -258,7 +294,7 @@ services:
     container_name: "mariadb"
     hostname: mariadb
     volumes:
-        - ${USERDIR}/docker/mariadb:/config
+      - ${USERDIR}/docker/mariadb:/config
     ports:
       - target: 3306
         published: 3306
@@ -282,7 +318,56 @@ services:
       - ${USERDIR}/shared_data:/data
       - ${USERDIR}/docker/shared:/shared
     ports:
-      - "443:443"
+      - "10014:443"
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
+
+#Traefik - Your Own Edge Router
+  traefik:
+    hostname: traefik
+    image: traefik:v1.7.16
+    container_name: traefik
+    restart: always
+    domainname: ${DOMAINNAME}
+    networks:
+      - default
+      - traefik_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "10015:8080"
+    environment:
+      - NAMECHEAP_API_KEY=${NAMECHEAP_API_KEY}
+      - NAMECHEAP_API_USER=${NAMECHEAP_API_USER}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=traefik"
+      - "traefik.frontend.rule=Host:traefik.${DOMAINNAME}"  
+#      - "traefik.frontend.rule=Host:${DOMAINNAME}; PathPrefixStrip: /traefik"
+      - "traefik.port=10015"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.browserXSSFilter=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.SSLHost=example.com"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+      - "traefik.frontend.headers.frameDeny=true"
+      - "traefik.frontend.auth.basic.users=${HTTP_USERNAME}:${HTTP_PASSWORD}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${USERDIR}/docker/traefik:/etc/traefik
+      - ${USERDIR}/docker/shared:/shared
+
+######### NETWORK ##########
+
+# Traefik_Proxy – External Treafik docker network
+networks:
+  traefik_proxy:
+    external:
+      name: traefik_proxy
+  default:
+    driver: bridge
